@@ -75,6 +75,30 @@
       text-decoration-thickness: max(1px, 0.07em);
     }
     .info a:hover { text-decoration: none; }
+
+    /* Mobile: logo top-left, info rotated to read bottom-to-top in the bottom-right.
+       Scales with viewport width, based on a 402px-wide design. */
+    @media (max-width: 767px) {
+      :root {
+        --u: calc(100vw / 402);
+        --gutter: calc(24 * var(--u));
+      }
+
+      .logo {
+        top: var(--gutter);
+        bottom: auto;
+        width: calc(190 * var(--u));
+      }
+
+      .info {
+        right: var(--gutter);
+        bottom: var(--gutter);
+        font-size: calc(14 * var(--u));
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-align: left;
+      }
+    }
   </style>
 </head>
 <body>
