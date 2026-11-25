@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Offshoot — Counsel for exceptional ventures</title>
+  <meta name="description" content="Offshoot — Counsel for exceptional ventures.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #efefef;
+      --ink: #131313;
+      /* Everything scales with viewport width, based on a 1440px-wide design. */
+      --u: calc(100vw / 1440);
+      --gutter: max(20px, calc(50 * var(--u)));
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Archivo", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+      cursor: grab;
+      touch-action: pan-y;          /* horizontal drags are ours, vertical scroll stays native */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .stage.is-dragging { cursor: grabbing; }
+
+    .stage video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .logo {
+      position: fixed;
+      left: var(--gutter);
+      bottom: var(--gutter);
+      width: max(180px, calc(368 * var(--u)));
+      height: auto;
+      pointer-events: none;
+    }
+
+    .info {
+      position: fixed;
+      right: var(--gutter);
+      bottom: var(--gutter);
+      text-align: right;
+      font-size: max(12px, calc(14 * var(--u)));
+      line-height: 1.55;
+    }
+
+    .info a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 0.15em;
+      text-decoration-thickness: max(1px, 0.07em);
+    }
+    .info a:hover { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="stage" id="stage" aria-label="Drag horizontally to rotate the tree">
+    <video id="tree" src="tree-rotation.mp4" muted playsinline preload="auto" disablepictureinpicture></video>
+  </main>
+
+  <img class="logo" src="Logo.svg" alt="Offshoot" width="368" height="80">
+
+  <footer class="info">
+    <p>Counsel for<br>exceptional ventures</p>
+    <a href="mailto:inquiries@offshootlegal.com">inquiries@offshootlegal.com</a>
+  </footer>
+
+  <script>
+    (() => {
+      const stage = document.getElementById('stage');
+      const video = document.getElementById('tree');
+
+      // How many full loops one viewport-width drag covers.
+      const LOOPS_PER_WIDTH = 1;
+      // Higher = snappier. Used for both drag smoothing and the return to frame 0.
+      const FOLLOW = 14;   // while dragging
+      const RETURN = 4;    // easing back to the first frame after release
+
+      let duration = 0;
+      let target = 0;      // time we want to show (unwrapped, may go <0 or >duration)
+      let shown = 0;       // smoothed time actually applied (unwrapped)
+      let dragging = false;
+      let startX = 0;
+      let startTarget = 0;
+      let last = performance.now();
+
+      const wrap = (t) => ((t % duration) + duration) % duration;
+
+      video.addEventListener('loadedmetadata', () => {
+        duration = video.duration;
+        video.pause();
+        video.currentTime = 0;
+      });
+
+      stage.addEventListener('pointerdown', (e) => {
+        if (!duration) return;
+        dragging = true;
+        startX = e.clientX;
+        target = shown;          // pick up wherever the tree currently is
+        startTarget = shown;
+        stage.setPointerCapture(e.pointerId);
+        stage.classList.add('is-dragging');
+      });
+
+      stage.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - startX;
+        target = startTarget + (dx / window.innerWidth) * duration * LOOPS_PER_WIDTH;
+      });
+
+      const release = () => {
+        if (!dragging) return;
+        dragging = false;
+        stage.classList.remove('is-dragging');
+
+        // Re-base both values into [0, duration) and head back to frame 0
+        // along the shortest way around the loop.
+        shown = wrap(shown);
+      };
+      stage.addEventListener('pointerup', release);
+      stage.addEventListener('pointercancel', release);
+      stage.addEventListener('lostpointercapture', release);
+
+      function tick(now) {
+        const dt = Math.min((now - last) / 1000, 0.1);
+        last = now;
+
+        if (duration) {
+          if (!dragging) {
+            // Home is frame 0 — either the start, or the end of the loop (same frame).
+            target = shown > duration / 2 ? duration : 0;
+          }
+          const k = 1 - Math.exp(-(dragging ? FOLLOW : RETURN) * dt);
+          shown += (target - shown) * k;
+
+          if (!dragging && Math.abs(target - shown) < 0.002) shown = target;
+
+          const t = Math.min(wrap(shown), duration - 0.001);
+          // Only issue a new seek once the previous one has landed, so seeks never pile up.
+          if (!video.seeking && Math.abs(video.currentTime - t) > 0.004) {
+            video.currentTime = t;
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
